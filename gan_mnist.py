@@ -54,19 +54,19 @@ class GAN():
 
         noise_shape = (self.z_dim,)
         model = Sequential()
-
-        model.add(Dense(256, input_shape=noise_shape))
-        model.add(LeakyReLU(alpha=0.2))
+        model.add(Dense(128*7*7, activation='relu', input_shape=noise_shape))
+        model.add(Reshape((7,7,128)))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512))
-        model.add(LeakyReLU(alpha=0.2))
+        
+        model.add(UpSampling2D())
+        model.add(Conv2D(128, (3,3),padding='same', activation='relu'))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(1024))
-        model.add(LeakyReLU(alpha=0.2))
+        
+        model.add(UpSampling2D())
+        model.add(Conv2D(64, (3,3),padding='same', activation='relu'))
         model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(np.prod(self.img_shape), activation='tanh'))
-        model.add(Reshape(self.img_shape))
-
+        
+        model.add(Conv2D(1, (3,3),padding='same', activation='tanh'))
         model.summary()
 
         return model
@@ -76,12 +76,21 @@ class GAN():
         img_shape = (self.img_rows, self.img_cols, self.channels)
         
         model = Sequential()
-
-        model.add(Flatten(input_shape=img_shape))
-        model.add(Dense(512))
+        model.add(Conv2D(32, (3,3),padding='same',input_shape=img_shape))
         model.add(LeakyReLU(alpha=0.2))
+        
+        model.add(MaxPooling2D(pool_size=(2,2)))
+        model.add(Conv2D(64, (3,3),padding='same'))
+        model.add(LeakyReLU(alpha=0.2))
+
+        model.add(MaxPooling2D(pool_size=(2,2)))
+        model.add(Conv2D(128, (3,3),padding='same'))
+        model.add(LeakyReLU(alpha=0.2))
+        
+        model.add(Flatten())
         model.add(Dense(256))
         model.add(LeakyReLU(alpha=0.2))
+        model.add(Dropout(0.5))
         model.add(Dense(1, activation='sigmoid'))
         model.summary()
 
@@ -155,11 +164,12 @@ class GAN():
                 g_loss = self.combined.train_on_batch(noise, valid_y)
 
                 # 進捗の表示
-                print ("epoch:%d, iter:%d,  [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, iteration, d_loss[0], 100*d_loss[1], g_loss))
+                print ("epoch:%d, iter:%d,  [D loss: %f, acc.: %.2f%%] [G loss: %f]" 
+                       % (epoch, iteration, d_loss[0], 100*d_loss[1], g_loss))
 
                 # 指定した間隔で生成画像を保存
-                if epoch % save_interval == 0:
-                    self.save_imgs(epoch)
+                if (iteration + epoch * num_batches) % save_interval == 0:
+                    self.save_imgs(iteration + epoch * num_batches)
 
     def save_imgs(self, epoch):
         # 生成画像を敷き詰めるときの行数、列数
@@ -184,4 +194,4 @@ class GAN():
         
 if __name__ == '__main__':
     gan = GAN()
-    gan.train(epochs=30, batch_size=128, save_interval=1)
+    gan.train(epochs=10, batch_size=128, save_interval=50)
